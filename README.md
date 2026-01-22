@@ -1,3 +1,16 @@
+# 图片瀑布流
+> 横屏排列
+> ![图片瀑布流](/images/1abf12.png)
+
+> 竖屏排列
+> ![图片瀑布流](/images/5a0135.png)
+
+
+# 演示地址
+[https://waterfall.41331.xyz/](https://waterfall.41331.xyz/)
+
+
+
 # 图片瀑布流查看器
 
 这是一个基于 HTML+JavaScript 的简单图片瀑布流查看器，使用 File System Access API 打开本地目录、预览图片并支持删除操作。
