@@ -1,0 +1,24 @@
+{
+  "name": "图片瀑布流",
+  "short_name": "瀑布流",
+  "description": "将包含图片的文件夹拖拽到窗口，即可快速预览。",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#111111",
+  "theme_color": "#111111",
+  "icons": [
+    {
+      "src": "icons/icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

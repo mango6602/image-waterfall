@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>图片瀑布流</title>
+  <meta name="description" content="将包含图片的文件夹拖拽到窗口，即可快速预览。" />
+  <meta name="theme-color" content="#111111" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <div class="header-copy">
+      <h1>图片瀑布流</h1>
+      <div class="dir-info">
+        <span id="dirLabel" class="dir-label"></span>
+        <span id="statsLabel" class="stats-label"></span>
+      </div>
+    </div>
+
+    <div class="header-tools">
+      <div class="layout-switch" role="group" aria-label="排列方式">
+        <button type="button" id="layoutVertical" class="seg" aria-pressed="true">竖向</button>
+        <button type="button" id="layoutHorizontal" class="seg" aria-pressed="false">横向</button>
+      </div>
+      <div class="settings-container">
+        <button id="settingsBtn" class="icon-button" aria-label="设置">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <div id="settingsPanel" class="settings-panel hidden">
+          <div class="setting-item" id="verticalSetting">
+            <label for="colWidthSlider">卡片宽度</label>
+            <div class="slider-container">
+              <input type="range" id="colWidthSlider" min="150" max="600" step="10">
+              <span id="colWidthValue" class="slider-value"></span>
+            </div>
+          </div>
+          <div class="setting-item" id="horizontalSetting">
+            <label for="rowHeightSlider">行高度</label>
+            <div class="slider-container">
+              <input type="range" id="rowHeightSlider" min="150" max="600" step="10">
+              <span id="rowHeightValue" class="slider-value"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button id="openDir" class="fallback-button" hidden>选择目录</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="emptyState" class="empty-state">
+      <div class="empty-illustration" aria-hidden="true"></div>
+      <h2>拖拽开始浏览</h2>
+      <p>支持将整个图片文件夹拖入或单击此区域选择</p>
+    </section>
+    <div id="gallery" class="masonry hidden"></div>
+  </main>
+
+  <div id="viewer" class="viewer hidden">
+    <div class="viewer-backdrop" id="viewerBackdrop"></div>
+    <div class="viewer-content">
+      <button id="closeViewer" class="close">✕</button>
+      <div id="viewerStage" class="viewer-stage">
+        <button id="prevBtn" class="viewer-nav viewer-nav-left" aria-label="上一张">‹</button>
+        <img id="viewerImg" src="" alt="" />
+        <button id="nextBtn" class="viewer-nav viewer-nav-right" aria-label="下一张">›</button>
+      </div>
+      <div id="viewerInfo" class="viewer-info"></div>
+      <div class="viewer-actions">
+        <button id="fullscreenBtn">全屏</button>
+        <button id="editBtn">编辑</button>
+        <button id="downloadBtn">下载</button>
+        <button id="deleteBtn">删除</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="editor" class="editor hidden">
+    <div class="editor-content">
+      <div class="editor-canvas-container">
+        <canvas id="editorCanvas"></canvas>
+        <div id="cropContainer" class="crop-container hidden">
+          <div id="cropBox" class="crop-box">
+            <div class="crop-handle nw" data-handle="nw"></div>
+            <div class="crop-handle ne" data-handle="ne"></div>
+            <div class="crop-handle sw" data-handle="sw"></div>
+            <div class="crop-handle se" data-handle="se"></div>
+            <div class="crop-handle n" data-handle="n"></div>
+            <div class="crop-handle s" data-handle="s"></div>
+            <div class="crop-handle w" data-handle="w"></div>
+            <div class="crop-handle e" data-handle="e"></div>
+          </div>
+        </div>
+      </div>
+      <div class="editor-toolbar">
+        <div class="editor-tools-group">
+          <button id="rotateLeftBtn" title="向左旋转">↺</button>
+          <button id="rotateRightBtn" title="向右旋转">↻</button>
+          <button id="flipHBtn" title="水平翻转">↔</button>
+          <button id="flipVBtn" title="垂直翻转">↕</button>
+          <button id="cropBtn" title="裁剪">✂</button>
+        </div>
+        <div class="editor-tools-group hidden" id="cropTools">
+          <button id="applyCropBtn" class="primary" title="应用裁剪">✓</button>
+          <button id="cancelCropBtn" title="取消裁剪">✕</button>
+        </div>
+        <div class="editor-tools-group">
+          <select id="filterSelect" aria-label="滤镜">
+            <option value="none">无滤镜</option>
+            <option value="grayscale">黑白</option>
+            <option value="sepia">复古</option>
+            <option value="invert">反色</option>
+            <option value="blur">模糊</option>
+            <option value="brightness">亮度(+)</option>
+            <option value="contrast">对比度(+)</option>
+          </select>
+        </div>
+        <div class="editor-tools-group">
+          <button id="saveBtn" class="primary">保存/导出</button>
+          <button id="cancelEditBtn" style="width: auto; padding: 0 16px; font-size: 14px;">取消</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveDialog" class="dialog-overlay hidden">
+    <div class="dialog">
+      <h3>保存图片</h3>
+      <div class="form-group">
+        <label for="saveFormat">格式</label>
+        <select id="saveFormat">
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/png">PNG</option>
+          <option value="image/webp">WebP</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="saveQuality">质量 (0.1 - 1.0)</label>
+        <input type="range" id="saveQuality" min="0.1" max="1.0" step="0.1" value="0.9">
+        <span id="saveQualityValue">0.9</span>
+      </div>
+      <div class="dialog-actions">
+        <button id="overwriteBtn" class="primary hidden" style="margin-right: auto; background-color: #d32f2f; color: white;">覆盖原图</button>
+        <button id="confirmSaveBtn" class="primary">保存</button>
+        <button id="cancelSaveBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="dropOverlay" class="drop-overlay hidden">
+    <span>松开鼠标以加载文件夹</span>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
