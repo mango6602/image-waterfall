@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-globals */
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE_NAME = `image-waterfall-pwa-${CACHE_VERSION}`;
 
 // 仅缓存应用壳（App Shell），图片内容来自本地文件夹/Blob URL，不由 SW 接管。

@@ -10,12 +10,10 @@ export function syncViewerStageChrome(pointer = null) {
   if (!dom.viewerStage) return;
   if (dom.viewer.classList.contains('hidden')) {
     dom.viewerStage.classList.remove('show-left', 'show-right', 'show-controls');
-    hideEdgeTip();
     return;
   }
   if (!pointer) {
     dom.viewerStage.classList.remove('show-left', 'show-right', 'show-controls');
-    if (!state.edgeTipTimer) hideEdgeTip();
     return;
   }
 
@@ -35,58 +33,9 @@ export function syncViewerStageChrome(pointer = null) {
   dom.viewerStage.classList.toggle('show-left', offsetX < edgeThreshold && hasPrev);
   dom.viewerStage.classList.toggle('show-right', fromRight < edgeThreshold && hasNext);
   dom.viewerStage.classList.toggle('show-controls', fromBottom < BOTTOM_CONTROLS_THRESHOLD);
-
-  // 最后一张：靠右侧边缘悬停时给出提示
-  const atLast = state.files.length > 0 && state.currentIndex === state.files.length - 1;
-  const shouldShowLastTip = atLast && fromRight < edgeThreshold;
-  state.edgeTipHovering = shouldShowLastTip;
-  if (shouldShowLastTip) {
-    showEdgeTip('最后一张', 'right');
-  } else if (!state.edgeTipTimer) {
-    hideEdgeTip();
-  }
-}
-
-let edgeTip = null;
-if (dom.viewerStage) {
-    edgeTip = document.createElement('div');
-    edgeTip.className = 'viewer-edge-tip';
-    edgeTip.setAttribute('aria-hidden', 'true');
-    dom.viewerStage.appendChild(edgeTip);
-}
-
-export function hideEdgeTip() {
-  if (!edgeTip) return;
-  edgeTip.classList.remove('show', 'left', 'right');
-  edgeTip.textContent = '';
-  state.edgeTipHovering = false;
-  if (state.edgeTipTimer) {
-    clearTimeout(state.edgeTipTimer);
-    state.edgeTipTimer = null;
-  }
 }
 
 let navHintTimer = null;
-
-export function showEdgeTip(text, side = 'right') {
-  if (!edgeTip) return;
-  edgeTip.textContent = text;
-  edgeTip.classList.toggle('right', side === 'right');
-  edgeTip.classList.toggle('left', side === 'left');
-  edgeTip.classList.add('show');
-  if (state.edgeTipTimer) {
-    clearTimeout(state.edgeTipTimer);
-    state.edgeTipTimer = null;
-  }
-}
-
-export function flashEdgeTip(text, side = 'right', durationMs = 900) {
-  showEdgeTip(text, side);
-  state.edgeTipTimer = setTimeout(() => {
-    state.edgeTipTimer = null;
-    if (!state.edgeTipHovering) hideEdgeTip();
-  }, durationMs);
-}
 
 export function openViewer(index) {
   const item = state.files[index];
@@ -155,7 +104,6 @@ export function closeViewerFn() {
   dom.viewer.classList.remove('fullscreen');
   dom.viewerStage.classList.remove('show-left', 'show-right', 'show-controls');
   state.lastPointer = null;
-  hideEdgeTip();
   dom.viewerImg.src = PLACEHOLDER;
   setCurrentIndex(-1);
   updateViewerInfo();
@@ -354,8 +302,8 @@ export function applyZoom(factor, clientX, clientY) {
   const rect = dom.viewerStage.getBoundingClientRect();
   const offsetX = clientX - (rect.left + rect.width / 2);
   const offsetY = clientY - (rect.top + rect.height / 2);
-  state.viewerState.x = state.viewerState.x * actualFactor + offsetX * (actualFactor - 1);
-  state.viewerState.y = state.viewerState.y * actualFactor + offsetY * (actualFactor - 1);
+  state.viewerState.x = state.viewerState.x * actualFactor - offsetX * (actualFactor - 1);
+  state.viewerState.y = state.viewerState.y * actualFactor - offsetY * (actualFactor - 1);
   state.viewerState.scale = targetScale;
   updateViewerTransform();
   updateViewerInfo();

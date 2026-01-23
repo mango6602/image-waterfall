@@ -26,6 +26,13 @@
         <button type="button" id="layoutHorizontal" class="seg" aria-pressed="false">横向</button>
       </div>
       <div class="settings-container">
+        <button id="helpPanelBtn" class="icon-button" aria-label="帮助">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
         <button id="settingsBtn" class="icon-button" aria-label="设置">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
@@ -46,6 +53,16 @@
               <input type="range" id="rowHeightSlider" min="150" max="600" step="10">
               <span id="rowHeightValue" class="slider-value"></span>
             </div>
+          </div>
+          <div class="setting-divider"></div>
+          <div class="setting-item">
+            <div class="checkbox-container">
+              <input type="checkbox" id="trashToggle">
+              <label for="trashToggle">删除时移入 .trash 文件夹</label>
+            </div>
+          </div>
+          <div class="setting-item">
+            <button id="emptyTrashBtn" class="action-button hidden">清空废纸篓</button>
           </div>
         </div>
       </div>
@@ -149,6 +166,36 @@
         <button id="overwriteBtn" class="primary hidden" style="margin-right: auto; background-color: #d32f2f; color: white;">覆盖原图</button>
         <button id="confirmSaveBtn" class="primary">保存</button>
         <button id="cancelSaveBtn">取消</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="loadingOverlay" class="loading-overlay hidden">
+    <div class="spinner"></div>
+    <p>正在加载...</p>
+  </div>
+
+  <div id="helpDialog" class="dialog-overlay hidden">
+    <div class="dialog">
+      <h3>使用说明</h3>
+      <div class="help-content">
+        <h4>快捷键</h4>
+        <ul class="key-list">
+          <li><kbd>←</kbd> / <kbd>→</kbd> <span>切换图片</span></li>
+          <li><kbd>F</kbd> <span>全屏模式</span></li>
+          <li><kbd>Del</kbd> <span>删除图片</span></li>
+          <li><kbd>Esc</kbd> <span>关闭预览</span></li>
+          <li><kbd>Ctrl</kbd> + 滚轮 <span>快速翻页</span></li>
+        </ul>
+        <h4>操作提示</h4>
+        <ul class="help-list">
+          <li>支持拖拽文件夹到窗口快速预览</li>
+          <li>滚轮缩放图片，双击图片还原/放大</li>
+          <li>按住鼠标左键拖拽平移图片</li>
+        </ul>
+      </div>
+      <div class="dialog-actions">
+        <button id="closeHelpBtn" class="primary">我知道了</button>
       </div>
     </div>
   </div>

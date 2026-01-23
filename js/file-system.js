@@ -1,5 +1,5 @@
 
-import { state, setFiles, setCurrentIndex, setCurrentDirHandle } from './state.js';
+import { state, setFiles, setCurrentIndex, setCurrentDirHandle, updateSettings } from './state.js';
 import { dom } from './dom.js';
 import { PLACEHOLDER, IMAGE_EXTENSIONS, formatBytes } from './utils.js';
 import { 
@@ -7,7 +7,7 @@ import {
   getMasonryColumnCount, 
   appendImageItem, 
   scheduleMasonryLayout, 
-  resetLazyObserver,
+  resetLazyObserver, 
   supportsCreateImageBitmap 
 } from './gallery.js';
 import { closeViewerFn, openViewer, updateItemIndices, updateViewerInfo } from './viewer.js';
@@ -19,8 +19,16 @@ export const supportsFileSystemHandleDrop =
   'getAsFileSystemHandle' in DataTransferItem.prototype;
 
 export const defaultEmptyMessage = canChooseDirectory
-  ? '支持将整个图片文件夹拖入或单击此区域选择；文件变更时可直接在弹窗中删除。'
-  : '支持将整个图片文件夹拖入浏览器；文件变更时可直接在弹窗中删除。';
+  ? '支持将整个图片文件夹拖入或单击此区域选择'
+  : '支持将整个图片文件夹拖入浏览器';
+
+function showLoading() {
+  if (dom.loadingOverlay) dom.loadingOverlay.classList.remove('hidden');
+}
+
+function hideLoading() {
+  if (dom.loadingOverlay) dom.loadingOverlay.classList.add('hidden');
+}
 
 export async function pickDirectory() {
   if (!canChooseDirectory || state.pickingDirectory) return;
@@ -53,61 +61,75 @@ export async function extractDroppedDirectoryHandle(dataTransfer) {
 }
 
 export async function loadImagesFromDir(dirHandle) {
-  closeViewerFn();
-  resetLazyObserver();
-  cleanupFileUrls();
-  dom.gallery.innerHTML = '';
-  ensureMasonryColumns(getMasonryColumnCount());
-  setFiles([]);
-  syncEmptyState();
+  showLoading();
+  // Small delay to allow UI to render loading state
+  await new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 
-  const imageEntries = [];
-  await collectImagesRecursive(dirHandle, '', imageEntries);
+  try {
+    closeViewerFn();
+    resetLazyObserver();
+    cleanupFileUrls();
+    dom.gallery.innerHTML = '';
+    ensureMasonryColumns(getMasonryColumnCount());
+    setFiles([]);
+    syncEmptyState();
 
-  imageEntries.sort((a, b) => a.path.localeCompare(b.path, 'zh-CN'));
+    const imageEntries = [];
+    await collectImagesRecursive(dirHandle, '', imageEntries);
 
-  if (!imageEntries.length && dom.emptyStateText) {
-    dom.emptyStateText.textContent = '所选目录未检测到支持的图片格式，请尝试其他文件夹。';
+    imageEntries.sort((a, b) => a.path.localeCompare(b.path, 'zh-CN'));
+
+    if (!imageEntries.length && dom.emptyStateText) {
+      dom.emptyStateText.textContent = '所选目录未检测到支持的图片格式，请尝试其他文件夹。';
+    }
+
+    const newFiles = [];
+    imageEntries.forEach((entry, idx) => {
+      const item = {
+        name: entry.name,
+        displayName: entry.path,
+        handle: entry.handle,
+        parent: entry.parent,
+        url: null,
+        loadingPromise: null,
+        filePromise: null,
+        metaPromise: null,
+        aspectRatio: null,
+        width: null,
+        height: null,
+        fileSize: null,
+        mimeType: '',
+        detailsPromise: null,
+        element: null,
+        imgElement: null,
+        preparing: false,
+      };
+      newFiles.push(item);
+    });
+    setFiles(newFiles);
+    
+    // Batch append items to avoid excessive layout thrashing
+    const fragment = document.createDocumentFragment();
+    // But appendImageItem expects to append to DOM or existing cols.
+    // If we want to use fragment, we'd need to modify appendImageItem.
+    // For now, let's just loop.
+    newFiles.forEach((item, idx) => {
+        appendImageItem(item, idx);
+    });
+
+    if (imageEntries.length && dom.emptyStateText) {
+      dom.emptyStateText.textContent = defaultEmptyMessage;
+    }
+
+    syncEmptyState();
+    scheduleMasonryLayout();
+    updateTrashButtonUI();
+  } catch (err) {
+    console.error('加载目录失败', err);
+    alert('加载目录失败: ' + err.message);
+  } finally {
+    hideLoading();
   }
-
-  const newFiles = [];
-  imageEntries.forEach((entry, idx) => {
-    const item = {
-      name: entry.name,
-      displayName: entry.path,
-      handle: entry.handle,
-      parent: entry.parent,
-      url: null,
-      loadingPromise: null,
-      filePromise: null,
-      metaPromise: null,
-      aspectRatio: null,
-      width: null,
-      height: null,
-      fileSize: null,
-      mimeType: '',
-      detailsPromise: null,
-      element: null,
-      imgElement: null,
-      preparing: false,
-    };
-    newFiles.push(item);
-    // We must push to state.files gradually or all at once? 
-    // The original code did `files.push(item); appendImageItem(item, idx);`
-    // So we should update the local array and the global state.
-  });
-  setFiles(newFiles);
-  
-  newFiles.forEach((item, idx) => {
-      appendImageItem(item, idx);
-  });
-
-  if (imageEntries.length && dom.emptyStateText) {
-    dom.emptyStateText.textContent = defaultEmptyMessage;
-  }
-
-  syncEmptyState();
-  scheduleMasonryLayout();
 }
 
 async function collectImagesRecursive(dirHandle, basePath, list) {
@@ -117,6 +139,7 @@ async function collectImagesRecursive(dirHandle, basePath, list) {
       const relativePath = basePath ? `${basePath}/${entry.name}` : entry.name;
       list.push({ handle: entry, parent: dirHandle, path: relativePath, name: entry.name });
     } else if (entry.kind === 'directory') {
+      if (entry.name === '.trash') continue;
       const nextPath = basePath ? `${basePath}/${entry.name}` : entry.name;
       await collectImagesRecursive(entry, nextPath, list);
     }
@@ -312,6 +335,110 @@ function smoothRemoveItem(item) {
   });
 }
 
+async function moveToTrash(item) {
+  if (!state.currentDirHandle) return;
+  const trashName = '.trash';
+  // Create .trash in the root of the opened directory
+  const trashHandle = await state.currentDirHandle.getDirectoryHandle(trashName, { create: true });
+  
+  // Get source file
+  const file = await item.handle.getFile();
+  
+  // Handle filename conflicts
+  let destName = item.name;
+  try {
+    // Check if file exists
+    await trashHandle.getFileHandle(destName, { create: false });
+    // If we are here, file exists. Find a unique name.
+    let counter = 1;
+    const extIndex = item.name.lastIndexOf('.');
+    const baseName = extIndex !== -1 ? item.name.substring(0, extIndex) : item.name;
+    const ext = extIndex !== -1 ? item.name.substring(extIndex) : '';
+    
+    while (true) {
+      const newName = `${baseName} (${counter})${ext}`;
+      try {
+        await trashHandle.getFileHandle(newName, { create: false });
+        counter++;
+      } catch (e) {
+        if (e.name === 'NotFoundError') {
+          destName = newName;
+          break;
+        }
+        throw e;
+      }
+    }
+  } catch (err) {
+    if (err.name !== 'NotFoundError') {
+      console.error('Check file existence error:', err);
+    }
+    // If NotFoundError, destName remains item.name, which is correct.
+  }
+  
+  const destHandle = await trashHandle.getFileHandle(destName, { create: true });
+  const writable = await destHandle.createWritable();
+  await writable.write(file);
+  await writable.close();
+  
+  // Remove source
+  await item.parent.removeEntry(item.name);
+  
+  // Update UI if trash is open or just update button
+  updateTrashButtonUI();
+}
+
+export async function getTrashCount() {
+  if (!state.currentDirHandle) return 0;
+  try {
+    const trashHandle = await state.currentDirHandle.getDirectoryHandle('.trash', { create: false });
+    let count = 0;
+    // Iterate to count. This might be slow for many files but it's the only way with File System Access API
+    for await (const _ of trashHandle.values()) {
+      count++;
+    }
+    return count;
+  } catch {
+    return 0;
+  }
+}
+
+export async function updateTrashButtonUI() {
+    if (!state.settings.enableTrash || !dom.emptyTrashBtn) return;
+    const count = await getTrashCount();
+    dom.emptyTrashBtn.textContent = `清空废纸篓 (${count})`;
+    dom.emptyTrashBtn.disabled = count === 0;
+    if (count === 0) {
+        dom.emptyTrashBtn.classList.add('disabled');
+    } else {
+        dom.emptyTrashBtn.classList.remove('disabled');
+    }
+}
+
+export async function emptyTrash() {
+  if (!state.currentDirHandle) return;
+  if (!confirm('确定要清空废纸篓吗？此操作不可恢复。')) return;
+  
+  try {
+    const trashName = '.trash';
+    // Get the handle first to make sure it exists
+    await state.currentDirHandle.getDirectoryHandle(trashName);
+    
+    // Remove the entire directory
+    await state.currentDirHandle.removeEntry(trashName, { recursive: true });
+    
+    alert('废纸篓已清空');
+    updateTrashButtonUI();
+  } catch (err) {
+    if (err.name === 'NotFoundError') {
+        alert('废纸篓已经是空的');
+        updateTrashButtonUI();
+    } else {
+        console.error('清空废纸篓失败', err);
+        alert('清空失败: ' + err.message);
+    }
+  }
+}
+
 export async function deleteFileAtIndex(index) {
   const item = state.files[index];
   if (!item) return;
@@ -321,15 +448,16 @@ export async function deleteFileAtIndex(index) {
     return;
   }
   try {
-    await parentHandle.removeEntry(item.name);
+    if (state.settings.enableTrash) {
+      await moveToTrash(item);
+    } else {
+      await parentHandle.removeEntry(item.name);
+    }
+
     cleanupItemResources(item, { preserveElement: true });
     const removalPromise = smoothRemoveItem(item);
     state.files.splice(index, 1);
-    // updateItemIndices(index); // This needs to be imported from somewhere or moved here
-    // Actually updateItemIndices is UI logic mostly.
     
-    // We need to re-implement updateItemIndices here or import it.
-    // Let's assume we import it from viewer.js (where it was in my mental map)
     updateItemIndices(index);
 
     syncEmptyState();

@@ -7,6 +7,7 @@ export const state = {
   settings: {
     minColWidth: parseInt(localStorage.getItem('minColWidth') || '200', 10),
     rowHeight: parseInt(localStorage.getItem('rowHeight') || '320', 10),
+    enableTrash: localStorage.getItem('enableTrash') === 'true',
   },
   viewerState: { scale: 1, x: 0, y: 0, minScale: 1, maxScale: 8 },
   isPanning: false,
@@ -16,6 +17,7 @@ export const state = {
   dragDepth: 0,
   pickingDirectory: false,
   lastPointer: null,
+  lastWheelNavTime: 0,
 };
 
 export function setFiles(newFiles) {

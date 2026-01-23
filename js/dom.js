@@ -22,6 +22,9 @@ export const dom = {
   viewerActions: document.querySelector('.viewer-actions'),
   
   // Settings elements
+  helpBtn: null, // Removed standalone button
+  helpDialog: document.getElementById('helpDialog'),
+  closeHelpBtn: document.getElementById('closeHelpBtn'),
   settingsBtn: document.getElementById('settingsBtn'),
   settingsPanel: document.getElementById('settingsPanel'),
   colWidthSlider: document.getElementById('colWidthSlider'),
@@ -30,6 +33,12 @@ export const dom = {
   rowHeightValue: document.getElementById('rowHeightValue'),
   verticalSetting: document.getElementById('verticalSetting'),
   horizontalSetting: document.getElementById('horizontalSetting'),
+  trashToggle: document.getElementById('trashToggle'),
+  emptyTrashBtn: document.getElementById('emptyTrashBtn'),
+  helpPanelBtn: document.getElementById('helpPanelBtn'),
+  
+  // Loading
+  loadingOverlay: document.getElementById('loadingOverlay'),
   
   // Editor elements
   editBtn: document.getElementById('editBtn'),

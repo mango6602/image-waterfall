@@ -8,7 +8,9 @@ import {
   deleteFileAtIndex, 
   syncEmptyState,
   supportsFileSystemHandleDrop,
-  canChooseDirectory
+  canChooseDirectory,
+  emptyTrash,
+  updateTrashButtonUI
 } from './js/file-system.js';
 import { 
   getMasonryColumnCount, 
@@ -32,8 +34,6 @@ import {
   openViewer, 
   closeViewerFn, 
   syncViewerStageChrome, 
-  hideEdgeTip, 
-  flashEdgeTip,
   updateNavButtons,
   isViewerFullscreen,
   syncFullscreenState,
@@ -134,7 +134,90 @@ if (dom.settingsBtn) {
       dom.settingsPanel.classList.add('hidden');
     }
   });
+
+  // Trash Settings
+  if (dom.trashToggle) {
+    dom.trashToggle.checked = state.settings.enableTrash;
+    if (state.settings.enableTrash && dom.emptyTrashBtn) {
+        dom.emptyTrashBtn.classList.remove('hidden');
+    }
+
+    dom.trashToggle.addEventListener('change', (e) => {
+      updateSettings('enableTrash', e.target.checked);
+      if (dom.emptyTrashBtn) {
+        dom.emptyTrashBtn.classList.toggle('hidden', !e.target.checked);
+      }
+      if (e.target.checked) {
+        updateTrashButtonUI();
+      }
+    });
+  }
+
+  if (dom.emptyTrashBtn) {
+    dom.emptyTrashBtn.addEventListener('click', () => {
+      emptyTrash();
+    });
+  }
+  
+  // Help Panel Button in Settings
+  if (dom.helpPanelBtn && dom.helpDialog) {
+    dom.helpPanelBtn.addEventListener('click', () => {
+      dom.settingsPanel.classList.add('hidden'); // Close settings
+      dom.helpDialog.classList.remove('hidden');
+    });
+  }
 }
+
+// Help Dialog Logic
+if (dom.helpDialog) {
+  if (dom.closeHelpBtn) {
+    dom.closeHelpBtn.addEventListener('click', () => {
+      dom.helpDialog.classList.add('hidden');
+    });
+  }
+  dom.helpDialog.addEventListener('click', (e) => {
+    if (e.target === dom.helpDialog) {
+      dom.helpDialog.classList.add('hidden');
+    }
+  });
+}
+
+// Global Wheel Event for Zooming Gallery when Viewer is hidden
+window.addEventListener('wheel', (ev) => {
+  if (!dom.viewer.classList.contains('hidden')) return; // Handled by viewer logic
+  if (!ev.ctrlKey) return;
+  
+  ev.preventDefault();
+  
+  const now = Date.now();
+  if (now - state.lastWheelNavTime < 50) return; // Throttle
+  state.lastWheelNavTime = now;
+
+  const direction = ev.deltaY > 0 ? -1 : 1; // Down(Positive) -> Zoom Out(Smaller), Up(Negative) -> Zoom In(Larger)
+  const step = 20;
+
+  if (state.layoutMode === 'horizontal') {
+    // Adjust Row Height
+    let newVal = state.settings.rowHeight + direction * step;
+    newVal = Math.max(150, Math.min(600, newVal));
+    if (newVal !== state.settings.rowHeight) {
+      updateSettings('rowHeight', newVal);
+      if (dom.rowHeightSlider) dom.rowHeightSlider.value = newVal;
+      if (dom.rowHeightValue) dom.rowHeightValue.textContent = `${newVal}px`;
+      scheduleMasonryLayout();
+    }
+  } else {
+    // Adjust Col Width
+    let newVal = state.settings.minColWidth + direction * step;
+    newVal = Math.max(150, Math.min(600, newVal));
+    if (newVal !== state.settings.minColWidth) {
+      updateSettings('minColWidth', newVal);
+      if (dom.colWidthSlider) dom.colWidthSlider.value = newVal;
+      if (dom.colWidthValue) dom.colWidthValue.textContent = `${newVal}px`;
+      scheduleMasonryLayout();
+    }
+  }
+}, { passive: false });
 
 // Open Button
 if (dom.openBtn) {
@@ -262,7 +345,6 @@ dom.viewerStage.addEventListener('mousemove', (ev) => {
 dom.viewerStage.addEventListener('mouseleave', () => {
   state.lastPointer = null;
   dom.viewerStage.classList.remove('show-left', 'show-right', 'show-controls');
-  hideEdgeTip();
 });
 
 dom.viewerStage.addEventListener(
@@ -270,6 +352,23 @@ dom.viewerStage.addEventListener(
   (ev) => {
     if (dom.viewer.classList.contains('hidden')) return;
     ev.preventDefault();
+
+    // Handle Ctrl + Wheel for navigation
+    if (ev.ctrlKey) {
+      if (Math.abs(ev.deltaY) < 10) return; // Ignore small movements
+      
+      const now = Date.now();
+      if (now - state.lastWheelNavTime < 150) return; // 150ms throttle
+      state.lastWheelNavTime = now;
+
+      if (ev.deltaY > 0) {
+        if (state.currentIndex < state.files.length - 1) openViewer(state.currentIndex + 1);
+      } else {
+        if (state.currentIndex > 0) openViewer(state.currentIndex - 1);
+      }
+      return;
+    }
+
     const direction = ev.deltaY < 0 ? 1 : -1;
     const factor = direction > 0 ? 1.12 : 0.9;
     applyZoom(factor, ev.clientX, ev.clientY);
@@ -331,8 +430,6 @@ document.addEventListener('keydown', async (ev) => {
     ev.preventDefault();
     if (state.currentIndex < state.files.length - 1) {
       openViewer(state.currentIndex + 1);
-    } else if (state.files.length > 0) {
-      flashEdgeTip('最后一张', 'right');
     }
   } else if (ev.key === 'ArrowLeft') {
     ev.preventDefault();
