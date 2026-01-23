@@ -6,8 +6,8 @@
 > ![图片瀑布流](/images/5a0135.png)
 
 
-# 演示地址
-[https://waterfall.41331.xyz/](https://waterfall.41331.xyz/)
+# 在线访问
+[https://mango6602.github.io/image-waterfall/](https://mango6602.github.io/image-waterfall/)
 
 
 
