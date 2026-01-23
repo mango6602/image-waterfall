@@ -447,35 +447,76 @@ export async function deleteFileAtIndex(index) {
     alert('未选择目录');
     return;
   }
-  try {
-    if (state.settings.enableTrash) {
-      await moveToTrash(item);
-    } else {
-      await parentHandle.removeEntry(item.name);
-    }
 
-    cleanupItemResources(item, { preserveElement: true });
-    const removalPromise = smoothRemoveItem(item);
-    state.files.splice(index, 1);
+  // Pre-calculate next index for immediate UI update
+  const hasNext = state.files.length > 1;
+  const nextIndex = index >= state.files.length - 1 ? index - 1 : index;
+
+  // Immediate UI Feedback:
+  // 1. If viewer is open, switch to next image immediately
+  if (!dom.viewer.classList.contains('hidden') && hasNext) {
+    // Open next/prev image visually without waiting for deletion
+    // We pass a flag or handle it such that we don't reload the deleted item
+    // But since we haven't spliced state.files yet, we need to be careful.
+    // Actually, we can just open the neighbor index.
+    // However, since we are about to delete index, the item at nextIndex (if > index) will shift.
+    // But for visual transition, we can just show the next item.
     
-    updateItemIndices(index);
-
-    syncEmptyState();
-    if (!state.files.length) {
-      await removalPromise;
-      cleanupItemResources(item);
-      closeViewerFn();
-      return;
-    }
-    if (!dom.viewer.classList.contains('hidden')) {
-      const nextIndex = Math.min(index, state.files.length - 1);
-      openViewer(nextIndex);
-    }
-    await removalPromise;
-    cleanupItemResources(item);
-    scheduleMasonryLayout();
-  } catch (err) {
-    console.error('删除失败', err);
-    alert('删除失败: ' + err.message);
+    // Better approach:
+    // 1. Start background deletion
+    // 2. Remove item from state.files immediately (optimistic update)
+    // 3. Update UI
   }
+
+  // Optimistic UI Update Sequence:
+  
+  // 1. Remove from local state immediately
+  state.files.splice(index, 1);
+  updateItemIndices(index); // Update subsequent indices
+  syncEmptyState();
+  
+  // 2. Update Viewer immediately if open
+  if (!dom.viewer.classList.contains('hidden')) {
+    if (state.files.length === 0) {
+      closeViewerFn();
+    } else {
+      // If we deleted the last item, nextIndex is the new last item (which was index-1)
+      // If we deleted middle, nextIndex is the same index (which is now the next item)
+      // Note: 'nextIndex' calculated above was based on old length.
+      // Let's recalculate based on new state.files
+      const newIndexToOpen = Math.min(index, state.files.length - 1);
+      openViewer(newIndexToOpen);
+    }
+  }
+
+  // 3. Visually remove from Grid (Masonry)
+  // We can trigger smooth removal animation
+  cleanupItemResources(item, { preserveElement: true });
+  const removalPromise = smoothRemoveItem(item);
+  
+  // 4. Background Operation
+  // We don't await this for the UI update, but we should handle errors if it fails.
+  // If it fails, we might need to reload or alert user (though optimistic UI makes rollback hard).
+  // For file system operations, failure is rare unless permission lost or file locked.
+  // We will just log/alert on error, but UI is already updated.
+  
+  (async () => {
+    try {
+      if (state.settings.enableTrash) {
+        await moveToTrash(item);
+      } else {
+        await parentHandle.removeEntry(item.name);
+      }
+    } catch (err) {
+      console.error('后台删除失败', err);
+      alert('删除失败: ' + err.message);
+      // In a robust app, we might want to reload directory here to sync state
+      // loadImagesFromDir(state.currentDirHandle); 
+    }
+  })();
+
+  // 5. Cleanup resources after animation
+  await removalPromise;
+  cleanupItemResources(item);
+  scheduleMasonryLayout();
 }
